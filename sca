@@ -1,0 +1,43 @@
+//Ready SCA Plugin
+         dir('/opt/Fortify/Fortify_SCA_and_Apps_19.1.0/plugins/maven') {
+         
+         sh '''
+         export SCA_HOME=/opt/Fortify/Fortify_SCA_and_Apps_19.1.0
+         export PATH=$PATH:$SCA_HOME/bin
+        
+         tar zxvf maven-plugin-bin.tar.gz
+         chmod u+x install.sh
+         ./install.sh
+         mvn com.fortify.sca.plugins.maven:sca-maven-plugin:clean
+         '''
+         }
+         
+         //SCA scanning
+         sh '''
+         export SCA_HOME=/opt/Fortify/Fortify_SCA_and_Apps_19.1.0
+         export PATH=$PATH:$SCA_HOME/bin
+
+         mvn com.fortify.sca.plugins.maven:sca-maven-plugin:clean
+         mvn com.fortify.sca.plugins.maven:sca-maven-plugin:translate
+         sourceanalyzer -b test -clean
+         sourceanalyzer -b test mvn package
+         currentTime=$(date '+%Y%m%d-%H%M%S')
+         sourceanalyzer -b test -scan -f SCA-scanResult-$currentTime.fpr
+         curl -v -u admin:admin123 --upload-file SCA-scanResult-$currentTime.fpr https://nexus.rh-internal.tk/repository/goodbeers-backend-SCA-scanresult/SCA-scanResult-$currentTime.fpr
+         rm -f SCA-scanResult.xml
+         ReportGenerator -format XML -f SCA-scanResult.xml -source SCA-scanResult-$currentTime.fpr
+         #echo "<groupTitle>Critical</groupTitle>" >> SCA-scanResult.xml
+         if grep -q "<groupTitle>Critical</groupTitle>" "SCA-scanResult.xml"; then echo "<<Source code contains critical issue>>";exit 1; fi
+         #sourceanalyzer -b test -scan -f SCA-scanResult-$currentTime.txt
+         #cat SCA-scanResult-$currentTime.txt
+         #FPRUtility -information -listIssues -project SCA-scanResult-$currentTime.fpr -f SCA-scanResult-$currentTime.txt
+         '''
+         
+         //def person = new XmlParser().parse(new File("SCA-scanResult.xml"))
+         //println "Low: ${ReportDefinition.ReportSection[0].SubSection[1].IssueListing.Chart.GroupingSection[0].count.text()}"
+         //println "Medium: ${ReportDefinition.ReportSection[0].SubSection[1].IssueListing.Chart.GroupingSection[1].count.text()}"
+         //println "High: ${ReportDefinition.ReportSection[0].SubSection[1].IssueListing.Chart.GroupingSection[2].count.text()}"
+
+       //if (readFile('SCA-scanResult.xml').contains('<groupTitle>Critical</groupTitle>')) {
+            //ERROR "contain critical issue";
+       //}  
